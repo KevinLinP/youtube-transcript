@@ -38,9 +38,9 @@ export class YoutubeTranscriptNotAvailableError extends YoutubeTranscriptError {
 }
 
 export class YoutubeTranscriptNotAvailableLanguageError extends YoutubeTranscriptError {
-  constructor(lang: string, availableLangs: string[], videoId: string) {
+  constructor(languages: string[], availableLangs: string[], videoId: string) {
     super(
-      `No transcripts are available in ${lang} this video (${videoId}). Available languages: ${availableLangs.join(
+      `No transcripts are available in ${languages.join(', ')} this video (${videoId}). Available languages: ${availableLangs.join(
         ', '
       )}`
     );
@@ -48,7 +48,7 @@ export class YoutubeTranscriptNotAvailableLanguageError extends YoutubeTranscrip
 }
 
 export interface TranscriptConfig {
-  lang?: string;
+  languages: string[];
 }
 export interface TranscriptResponse {
   text: string;
@@ -75,7 +75,7 @@ export class YoutubeTranscript {
       `https://www.youtube.com/watch?v=${identifier}`,
       {
         headers: {
-          ...(config?.lang && { 'Accept-Language': config.lang }),
+          ...(config?.languages && { 'Accept-Language': config.languages.join(',') }),
           'User-Agent': USER_AGENT,
         },
       }
@@ -113,29 +113,29 @@ export class YoutubeTranscript {
     }
 
     if (
-      config?.lang &&
+      config?.languages &&
       !captions.captionTracks.some(
-        (track) => track.languageCode === config?.lang
+        (track) => config.languages.includes(track.languageCode)
       )
     ) {
       throw new YoutubeTranscriptNotAvailableLanguageError(
-        config?.lang,
+        config?.languages,
         captions.captionTracks.map((track) => track.languageCode),
         videoId
       );
     }
 
     const transcriptURL = (
-      config?.lang
+      config?.languages
         ? captions.captionTracks.find(
-            (track) => track.languageCode === config?.lang
+            (track) => config.languages.includes(track.languageCode)
           )
         : captions.captionTracks[0]
     ).baseUrl;
 
     const transcriptResponse = await fetch(transcriptURL, {
       headers: {
-        ...(config?.lang && { 'Accept-Language': config.lang }),
+        ...(config?.languages && { 'Accept-Language': config.languages.join(',') }),
         'User-Agent': USER_AGENT,
       },
     });
@@ -148,7 +148,7 @@ export class YoutubeTranscript {
       text: result[3],
       duration: parseFloat(result[2]),
       offset: parseFloat(result[1]),
-      lang: config?.lang ?? captions.captionTracks[0].languageCode,
+      lang: config?.languages[0] ?? captions.captionTracks[0].languageCode,
     }));
   }
 
